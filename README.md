@@ -82,6 +82,46 @@ Dispositivo aciona/desliga LED
 ==============================================================================================================================================================
 
 
+Ligações dos Componentes no Wokwi
+
+A simulação no Wokwi utiliza um ESP32, um sensor LDR e um LED indicador.
+Abaixo estão todas as conexões utilizadas para o funcionamento do sistema:
+
+Conexões do LDR
+
+O LDR foi montado em conjunto com um resistor de 10kΩ formando um divisor de tensão. A leitura resultante é enviada para o pino analógico do ESP32.
+
+Componente	Pino/Terminal	Conexão
+LDR	Terminal 1	3.3V do ESP32
+LDR	Terminal 2	Nó comum com o resistor de 10kΩ
+Resistor 10kΩ	Terminal 1	Nó comum com LDR
+Resistor 10kΩ	Terminal 2	GND
+Nó comum	—	Pino 34 (ADC1_CH6) do ESP32
+
+Esse divisor de tensão permite que o ESP32 converta variações de luminosidade em valores analógicos (0–4095).
+
+Conexões do LED indicador
+
+O LED acende automaticamente quando o nível atinge CRITICAL.
+
+Componente	Pino	Conexão
+LED	Anodo (+)	GPIO 2 do ESP32
+LED	Catodo (–)	GND
+
+No código, o LED é ativado com digitalWrite(LED_PIN, HIGH) quando o sistema entra em estado crítico.
+
+ Alimentação
+Componente	Conexão
+ESP32	Alimentado internamente pelo Wokwi (VIN virtual)
+Sensor LDR	3.3V → LDR / GND → resistor de 10kΩ
+LED	Alimentado pelo GPIO 2 (3.3V controlado por software)
+
+
+
+==============================================================================================================================================================
+
+
+
 <img width="1859" height="893" alt="image" src="https://github.com/user-attachments/assets/81e8f14a-3a47-4d5b-b46c-73772c97bccf" />
 
 
