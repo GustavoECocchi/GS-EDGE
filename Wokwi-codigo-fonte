@@ -1,0 +1,150 @@
+#include <WiFi.h>
+#include <PubSubClient.h>
+
+// --------------------------------------------------
+// CONFIG Wi-Fi
+// --------------------------------------------------
+const char* ssid = "Wokwi-GUEST";
+const char* password = "";
+
+// --------------------------------------------------
+// CONFIG MQTT — IoT Agent FIWARE
+// --------------------------------------------------
+const char* mqtt_server = "44.223.43.74";
+const int mqtt_port = 1883;
+
+// --------------------------------------------------
+// IDENTIFICAÇÃO NO FIWARE
+// --------------------------------------------------
+const char* device_id = "device562472";   
+const char* api_key   = "smart";          
+
+// --------------------------------------------------
+// PINOS
+// --------------------------------------------------
+#define LED_PIN 2
+#define LDR_PIN 34
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+// --------------------------------------------------
+// Callback: comandos /smart/device562472/cmd
+// --------------------------------------------------
+void callback(char* topic, byte* payload, unsigned int length) {
+  String msg = "";
+  for (int i = 0; i < length; i++) msg += (char)payload[i];
+
+  Serial.print("Comando recebido: ");
+  Serial.println(msg);
+
+  if (msg.startsWith("on")) {
+    digitalWrite(LED_PIN, HIGH);
+    client.publish("/smart/device562472/cmdexe", "on|OK");
+  }
+  else if (msg.startsWith("off")) {
+    digitalWrite(LED_PIN, LOW);
+    client.publish("/smart/device562472/cmdexe", "off|OK");
+  }
+}
+
+// --------------------------------------------------
+// Conectar ao WiFi
+// --------------------------------------------------
+void setup_wifi() {
+  Serial.println();
+  Serial.print("Conectando em ");
+  Serial.println(ssid);
+
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nWiFi conectado!");
+  Serial.print("IP: ");
+  Serial.println(WiFi.localIP());
+}
+
+// --------------------------------------------------
+// Reconectar MQTT com ressubscrição
+// --------------------------------------------------
+void reconnect() {
+  while (!client.connected()) {
+    Serial.print("Conectando ao MQTT... ");
+
+    if (client.connect(device_id)) {
+      Serial.println("Conectado!");
+
+      String subTopic = String("/") + api_key + "/" + device_id + "/cmd";
+      client.subscribe(subTopic.c_str(), 1);  // QoS 1 = confiável
+      Serial.print("Inscrito em: ");
+      Serial.println(subTopic);
+
+    } else {
+      Serial.print("Falhou, rc=");
+      Serial.print(client.state());
+      Serial.println(" tentando novamente em 5s");
+      delay(5000);
+    }
+  }
+}
+
+// --------------------------------------------------
+// Envio UL2.0 para FIWARE (formato: s|valor|d|valor)
+// --------------------------------------------------
+void sendToFiware(int luminosityPercent, String state) {
+  char payload[60];
+  sprintf(payload, "s|%s|d|%d", state.c_str(), luminosityPercent);
+
+  String topic = String("/") + api_key + "/" + device_id + "/attrs";
+  client.publish(topic.c_str(), payload);
+
+  Serial.print("Enviado → ");
+  Serial.println(payload);
+}
+
+// --------------------------------------------------
+// SETUP
+// --------------------------------------------------
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
+
+  setup_wifi();
+
+  client.setServer(mqtt_server, mqtt_port);
+  client.setCallback(callback);
+
+  Serial.println("Sistema iniciado — monitorando luminosidade...");
+}
+
+// --------------------------------------------------
+// LOOP principal
+// --------------------------------------------------
+void loop() {
+  if (!client.connected()) reconnect();
+  client.loop();
+
+  int rawValue = analogRead(LDR_PIN);
+  int luminosityPercent = map(rawValue, 0, 4095, 0, 100);
+
+  Serial.print("Luminosidade (%): ");
+  Serial.println(luminosityPercent);
+
+  String level;
+  if (luminosityPercent < 50) level = "low";
+  else if (luminosityPercent <= 70) level = "mid";
+  else level = "critical";
+
+  // LED acende apenas no nível crítico
+  digitalWrite(LED_PIN, (level == "critical") ? HIGH : LOW);
+
+  sendToFiware(luminosityPercent, level);
+
+  delay(3000);
+}
