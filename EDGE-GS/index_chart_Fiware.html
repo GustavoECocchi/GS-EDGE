@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monitoramento Tesseract</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+
+    body {
+      font-family: 'Inter', sans-serif;
+      /* ALTERADO: Gradiente agora vai de cinza escuro para preto total */
+      background: linear-gradient(135deg, #434343 0%, #1f1f1f 40%, #000000 100%);
+      background-attachment: fixed;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      color: #fff;
+    }
+
+    h1 {
+      font-size: 3em;
+      font-weight: 800;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      /* Ajuste leve no gradiente do texto para brilhar mais no fundo escuro */
+      background: linear-gradient(90deg, #d8b4fe, #a855f7); 
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent; 
+      text-shadow: 0px 0px 30px rgba(168, 85, 247, 0.8);
+    }
+
+    .dashboard-card {
+      /* Ajuste na opacidade do vidro para se destacar no fundo escuro */
+      background: rgba(255, 255, 255, 0.05); 
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8); /* Sombra mais forte */
+      padding: 30px;
+      width: 95%;
+      max-width: 900px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .medicao-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+        width: 100%;
+    }
+
+    .medicao-label {
+        font-weight: 600;
+        margin-right: 15px;
+        color: #cccccc; 
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        font-size: 0.9em;
+    }
+
+    .medicao-valor {
+      font-size: 1.5em;
+      font-weight: bold;
+      padding: 10px 40px;
+      border-radius: 12px;
+      background: linear-gradient(90deg, #7c3aed, #0891b2); /* Roxo p/ Azul mais escuro */
+      color: white;
+      box-shadow: 0 0 20px rgba(8, 145, 178, 0.4);
+      min-width: 100px;
+      text-align: center;
+    }
+
+    .chart-wrapper {
+      width: 100%;
+      position: relative;
+    }
+
+    @media (max-width: 600px) {
+        h1 { font-size: 2em; }
+        .dashboard-card { padding: 15px; }
+        .medicao-container { flex-direction: column; gap: 10px; }
+        .medicao-label { margin-right: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>TESSERACT</h1>
+  
+  <div class="dashboard-card">
+    <div class="medicao-container">
+        <span class="medicao-label">Nível do Potenciômetro</span>
+        <div id="potenciometro" class="medicao-valor">--</div>
+    </div>
+
+    <div class="chart-wrapper">
+      <canvas id="chartPot"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const ctxPot = document.getElementById('chartPot').getContext('2d');
+    
+    // Gradiente do gráfico levemente ajustado
+    let gradient = ctxPot.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, 'rgba(124, 58, 237, 0.6)'); 
+    gradient.addColorStop(1, 'rgba(8, 145, 178, 0.0)');
+
+    const chartPot = new Chart(ctxPot, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Potenciômetro',
+          data: [],
+          borderColor: '#22d3ee', // Ciano mais brilhante
+          backgroundColor: gradient,
+          borderWidth: 3,
+          pointBackgroundColor: '#111', // Ponto escuro
+          pointBorderColor: '#22d3ee', // Borda neon
+          pointRadius: 4,
+          pointHoverRadius: 7,
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { 
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: 'rgba(30, 30, 30, 0.9)',
+                titleColor: '#fff',
+                bodyColor: '#22d3ee',
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+                borderWidth: 1,
+                padding: 10,
+                displayColors: false
+            }
+        },
+        scales: {
+          x: { 
+            title: { display: true, text: 'Tempo (mm:ss)', color: 'rgba(255,255,255,0.4)' },
+            ticks: { color: 'rgba(255,255,255,0.5)' },
+            grid: { color: 'rgba(255,255,255,0.03)' } 
+          },
+          y: { 
+            beginAtZero: false,
+            ticks: { color: 'rgba(255,255,255,0.5)' },
+            grid: { color: 'rgba(255,255,255,0.03)' }
+          }
+        }
+      }
+    });
+
+    const MAX_PONTOS = 720; 
+    let tempoSegundos = 0;
+
+    function formatarTempo(segundos) {
+      const minutos = Math.floor(segundos / 60);
+      const seg = segundos % 60;
+      return `${minutos.toString().padStart(2, '0')}:${seg.toString().padStart(2, '0')}`;
+    }
+
+    function atualizarDados() {
+      fetch("http://54.221.163.3:1026/v2/entities/urn:ngsi-ld:device:001/attrs/p", {
+        method: "GET",
+        headers: {
+          "Fiware-Service": "smart",
+          "Fiware-ServicePath": "/",
+          "Accept": "application/json"
+        }
+      })
+        .then(response => response.json())
+        .then(data => {
+          const valor = data.value;
+          document.getElementById('potenciometro').textContent = valor;
+
+          tempoSegundos += 5;
+          const tempoLabel = formatarTempo(tempoSegundos);
+
+          chartPot.data.labels.push(tempoLabel);
+          chartPot.data.datasets[0].data.push(valor);
+
+          if (chartPot.data.labels.length > MAX_PONTOS) {
+            chartPot.data.labels.shift();
+            chartPot.data.datasets[0].data.shift();
+          }
+
+          chartPot.update();
+        })
+        .catch(e => console.log("Falha ao buscar dados:", e));
+    }
+
+    atualizarDados();
+    setInterval(atualizarDados, 5000);
+  </script>
+</body>
+</html>
