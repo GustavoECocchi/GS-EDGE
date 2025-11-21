@@ -82,8 +82,11 @@ Dispositivo aciona/desliga LED
 ==============================================================================================================================================================
 
 
+<img width="1859" height="893" alt="image" src="https://github.com/user-attachments/assets/81e8f14a-3a47-4d5b-b46c-73772c97bccf" />
 
 
+
+<img width="1861" height="895" alt="image" src="https://github.com/user-attachments/assets/cd9e015c-a2b9-4728-8091-c49e40804a2f" />
 
 
 
